@@ -1,0 +1,3 @@
+Building pipeline :
+1. create a local repo and clone it in local repo (Add Experiments).
+2. Add src folder along with all components(run  them individually).
