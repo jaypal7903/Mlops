@@ -6,3 +6,5 @@ Building pipeline :
 
 setting up dvc pipeline (without params)
 5. create dvc.ymal file and add stages to it.
+6. dvc init then "dvc repro" to test the pipeline automation. (check dvc dag)
+7. Now git add, commit, push
