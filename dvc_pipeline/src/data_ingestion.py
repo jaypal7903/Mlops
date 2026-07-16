@@ -2,6 +2,7 @@ import pandas as pd
 import os
 from sklearn.model_selection import train_test_split
 import logging
+import yaml
 
 # Ensure the "logs" directory exists
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -29,6 +30,25 @@ file_handler.setFormatter(formatter)
 # add file_handler and consol_handler in logger object
 logger.addHandler(consol_handler)
 logger.addHandler(file_handler)
+
+def load_params(file_path : str) -> dict :
+    """
+    Load the parameter form yaml file.
+    """
+    try :
+        with open(file_path , 'r') as file :
+            params = yaml.safe_load(file)
+        logger.debug('params retrived form %s', file_path)
+        return params
+    except FileNotFoundError as e :
+        logger.error('File not found : %s', file_path)
+        raise
+    except yaml.YAMLError as e :
+        logger.error('YAML error: %s', e)
+        raise
+    except Exception as e :
+        logger.error('unexpected error: %s', e)
+        raise
 
 # The data logging function
 def load_data(data_url : str) -> pd.DataFrame :
@@ -73,7 +93,9 @@ def save_data(train_data : pd.DataFrame, test_data : pd.DataFrame, data_path : s
 # The main function
 def main() :
     try :
-        test_size = 0.2
+        # test_size = 0.2
+        params = load_params('D:\Mlops\dvc_pipeline\params.yaml')
+        test_size = params['data_ingestion']['test_size']
         data_path = os.path.join(BASE_DIR, 'experiments', 'spam.csv')
         df = load_data(data_path)
         final_df = preprocess_data(df)

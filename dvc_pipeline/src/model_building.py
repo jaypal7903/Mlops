@@ -1,116 +1,228 @@
-import numpy as np
-import pandas as pd
 import os
 import pickle
 import logging
+import yaml
+import pandas as pd
+import numpy as np
+
 from sklearn.ensemble import RandomForestClassifier
 
+# =============================================================================
+# Project Paths
+# =============================================================================
 
-# Ensure log directory exists
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))
-log_dir = os.path.join(BASE_DIR, 'logs')
-os.makedirs(log_dir, exist_ok= True)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# Logging configuration
-logger = logging.getLogger('model_building')
-logger.setLevel('DEBUG')
+LOG_DIR = os.path.join(BASE_DIR, "logs")
+os.makedirs(LOG_DIR, exist_ok=True)
 
-# create the consol handler object
-consol_handler = logging.StreamHandler()
-consol_handler.setLevel('DEBUG')
+# =============================================================================
+# Logger Configuration
+# =============================================================================
 
-# create the object of file handler 
-log_file_path = os.path.join(log_dir, 'model_building.log')
-file_handler = logging.FileHandler(log_file_path)
-file_handler.setLevel('DEBUG')
+logger = logging.getLogger("model_building")
+logger.setLevel(logging.DEBUG)
 
-# set the message formmet and set in consol handler and file handler
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-consol_handler.setFormatter(formatter)
-file_handler.setFormatter(formatter)
+if not logger.handlers:
 
-logger.addHandler(consol_handler)
-logger.addHandler(file_handler)
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.DEBUG)
 
-def load_data(file_path : str) -> pd.DataFrame :
+    file_handler = logging.FileHandler(
+        os.path.join(LOG_DIR, "model_building.log")
+    )
+    file_handler.setLevel(logging.DEBUG)
+
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+
+    console_handler.setFormatter(formatter)
+    file_handler.setFormatter(formatter)
+
+    logger.addHandler(console_handler)
+    logger.addHandler(file_handler)
+
+# =============================================================================
+# Functions
+# =============================================================================
+
+def load_params(file_path: str) -> dict:
     """
-    Load the data from a CSV  file.
+    Load parameters from params.yaml.
     """
+
+    try:
+        with open(file_path, "r") as file:
+            params = yaml.safe_load(file)
+
+        logger.debug("Parameters loaded from %s", file_path)
+
+        return params
+
+    except FileNotFoundError:
+        logger.error("Parameter file not found: %s", file_path)
+        raise
+
+    except yaml.YAMLError as e:
+        logger.error("YAML Error: %s", e)
+        raise
+
+    except Exception as e:
+        logger.error("Unexpected Error: %s", e)
+        raise
+
+
+def load_data(file_path: str) -> pd.DataFrame:
+    """
+    Load training data.
+    """
+
     try:
         df = pd.read_csv(file_path)
-        logger.debug('Data Loaded from the %s with the shape %s',file_path, df.shape)
+
+        logger.debug(
+            "Data loaded from %s with shape %s",
+            file_path,
+            df.shape,
+        )
+
         return df
-    except pd.errors.ParserError as e:
-        logger.error('Failed to parse the CSV file : %s', e)
-        raise
-    except FileNotFoundError as e :
-        logger.error('File Not found : %s', e)
-        raise
-    except Exception as e :
-        logger.error('Unexpected error occurred while loading the data: %s', e)
+
+    except FileNotFoundError:
+        logger.error("File not found: %s", file_path)
         raise
 
-def train_model(x_train : np.ndarray , y_train : np.ndarray) -> RandomForestClassifier :
+    except Exception as e:
+        logger.error("Error while loading data: %s", e)
+        raise
+
+
+def train_model(
+    x_train: np.ndarray,
+    y_train: np.ndarray,
+    params: dict
+) -> RandomForestClassifier:
     """
-    Train the RandomForest Model.
-
-    x_train : training features
-    y_train : training labels
-    return : RandomforestClassifire
+    Train Random Forest model.
     """
-    try :
-        if x_train.shape[0] != y_train.shape[0] :
-            raise ValueError('The number of sample in x_train and y_train is must be same.')
-        
-        logger.debug('Intialized the RandomForest model')
-        clf = RandomForestClassifier(n_estimators=22, random_state=2)
 
-        logger.debug('Model training started with %d samples', x_train.shape[0])
-        clf.fit(x_train, y_train)
-        logger.debug('Model training completed.')
+    try:
 
-        return clf
-    
-    except ValueError as e :
-        logger.error('Value error during the training : %s', e)
+        if len(x_train) != len(y_train):
+            raise ValueError(
+                "x_train and y_train must contain the same number of samples."
+            )
+
+        logger.debug(
+            "Initializing RandomForestClassifier..."
+        )
+
+        model = RandomForestClassifier(
+            n_estimators=params["n_estimators"],
+            random_state=params["random_state"]
+        )
+
+        logger.debug(
+            "Training model on %d samples...",
+            len(x_train)
+        )
+
+        model.fit(x_train, y_train)
+
+        logger.debug("Model training completed successfully.")
+
+        return model
+
+    except KeyError as e:
+        logger.error("Missing parameter in params.yaml: %s", e)
         raise
-    except Exception as e :
-        logger.error('Error during model training %s', e)
+
+    except Exception as e:
+        logger.error("Error during model training: %s", e)
         raise
 
-def save_model(model: RandomForestClassifier, file_path : str) -> None :
-    """
-    Saved the trained model to file.
-    """
-    try :
-        # Ensure the directory is exists
-        os.makedirs(os.path.dirname(file_path), exist_ok= True)
 
-        with open(file_path, 'wb') as file :
+def save_model(model, file_path: str):
+    """
+    Save trained model.
+    """
+
+    try:
+
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+        with open(file_path, "wb") as file:
             pickle.dump(model, file)
-        logger.debug('Model saved to %s', file_path)
 
-    except FileNotFoundError as e :
-        logger.error('File not found :%s', e)
+        logger.debug(
+            "Model saved successfully at %s",
+            file_path
+        )
+
+    except Exception as e:
+        logger.error("Error while saving model: %s", e)
         raise
-    except Exception as e :
-        logger.error('Error occurred while saving the model: %s',e)
+
+
+# =============================================================================
+# Main Function
+# =============================================================================
+
+def main():
+
+    try:
+
+        # Load parameters
+        params = load_params(
+            os.path.join(BASE_DIR, "params.yaml")
+        )
+
+        model_params = params["model_building"]
+
+        # Load processed training data
+        train_data = load_data(
+            os.path.join(
+                BASE_DIR,
+                "data",
+                "processed",
+                "train_tfidf.csv",
+            )
+        )
+
+        # Features and Target
+        x_train = train_data.iloc[:, :-1].values
+        y_train = train_data.iloc[:, -1].values
+
+        # Train model
+        model = train_model(
+            x_train=x_train,
+            y_train=y_train,
+            params=model_params,
+        )
+
+        # Save model
+        save_model(
+            model,
+            os.path.join(
+                BASE_DIR,
+                "data",
+                "models",
+                "model.pkl",
+            ),
+        )
+
+        logger.debug("Model Building Stage Completed Successfully.")
+
+    except Exception as e:
+
+        logger.error(
+            "Failed to complete model building stage: %s",
+            e,
+        )
+
         raise
 
-def main() :
-    try :
-        train_data = load_data("D:/Mlops/dvc_pipeline/data/processed/train_tfidf.csv")
-        x_train = train_data.iloc[:,:-1].values
-        y_train = train_data.iloc[:,-1].values
 
-        clf = train_model(x_train=x_train, y_train= y_train)
-
-        model_save_path = 'D:/Mlops/dvc_pipeline/data/models/model.pkl'
-        save_model(clf,model_save_path)
-
-    except Exception as e :
-        logger.error('Failed to complete the model buiding process : %s', e)
-        print(f"Error : {e}")
-
-if __name__ == '__main__' :
+if __name__ == "__main__":
     main()

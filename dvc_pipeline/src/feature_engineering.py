@@ -2,6 +2,7 @@ import pandas as pd
 import logging
 from sklearn.feature_extraction.text import TfidfVectorizer
 import os
+import yaml
 
 # Ensure log directory exists
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
@@ -28,6 +29,25 @@ file_handler.setFormatter(formatter)
 
 logger.addHandler(consol_handler)
 logger.addHandler(file_handler)
+
+def load_params(file_path : str) -> dict :
+    """
+    Load the parameter form YAML file.
+    """
+    try :
+        with open(file_path , 'r') as file :
+            params = yaml.safe_load(file)
+        logger.debug('params retrived from %s', file_path)
+        return params
+    except FileNotFoundError as e :
+        logger.error('File not found: %s',file_path)
+        raise
+    except yaml.YAMLError as e :
+        logger.error('yaml error : %s', e)
+        raise
+    except Exception as e :
+        logger.error('unexpected error :%s', e)
+        raise
 
 def load_data(file_path : str) -> pd.DataFrame :
     """Load data from a CSV file ."""
@@ -81,7 +101,9 @@ def save_data(df: pd.DataFrame, file_path : str) -> None :
 
 def main() :
     try:
-        max_feature = 50
+        # max_feature = 50
+        params = load_params('D:\Mlops\dvc_pipeline\params.yaml')
+        max_feature = params['feature_engineering']['max_feature']
 
         train_data = load_data("D:/Mlops/dvc_pipeline/data/interim/train_processed_data.csv")
         test_data = load_data("D:/Mlops/dvc_pipeline/data/interim/test_processed_data.csv")

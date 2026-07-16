@@ -1,8 +1,4 @@
-data/raw
-data/interim
-data/models
-data/reports
-data/processed
+data
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
