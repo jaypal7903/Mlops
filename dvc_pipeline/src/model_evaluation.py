@@ -5,6 +5,8 @@ import logging
 import json
 import pickle
 from sklearn.metrics import accuracy_score, precision_score, recall_score, roc_auc_score
+import yaml
+from dvclive import Live
 
 # Ensure log directory exists
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
@@ -32,6 +34,25 @@ file_handler.setFormatter(formatter)
 if not logger.handlers:
     logger.addHandler(consol_handler)
     logger.addHandler(file_handler)
+
+def load_params(file_path : str) -> dict :
+    """
+    Load the parameter form yaml file.
+    """
+    try :
+        with open(file_path , 'r') as file :
+            params = yaml.safe_load(file) 
+        logger.debug('Parameter retrived from %s', file_path)
+        return params
+    except FileNotFoundError as e :
+        logger.error('File not found: %s', file_path)
+        raise 
+    except yaml.YAMLError as e :
+        logger.error('YAML error: %s', e)
+        raise
+    except Exception as e :
+        logger.error('Unexpected error : %s', e)
+        raise 
 
 def load_model(file_path : str) :
     """
@@ -106,6 +127,7 @@ def save_matrics(matrics : dict , file_path : str) -> None :
 
 def main() :
     try :
+        params = load_params('D:/Mlops/dvc_pipeline/params.yaml')
         clf = load_model("D:/Mlops/dvc_pipeline/data/models/model.pkl")
         test_data = load_data('D:/Mlops/dvc_pipeline/data/processed/test_tfidf.csv')
 
@@ -113,6 +135,14 @@ def main() :
         y_test = test_data.iloc[:,-1].values
 
         matrics = model_evaluation(clf=clf, x_test= x_test, y_test= y_test)
+
+        # Experiment using dvclive 
+        with Live(save_dvc_exp=True) as live :
+            live.log_metric('accuracy', accuracy_score(y_test,y_test))
+            live.log_metric('precision', precision_score(y_test,y_test))
+            live.log_metric('recall', recall_score(y_test,y_test))
+
+            live.log_params(params=params)
 
         file_path = 'D:/Mlops/dvc_pipeline/data/reports/matrics.json'
         save_matrics(matrics= matrics,file_path= file_path)
